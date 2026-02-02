@@ -26,8 +26,8 @@ The ESP32-CAM connects to Wi-Fi, listens for new Telegram messages, and automati
 ### Arduino Libraries
 Install these libraries in Arduino IDE (Library Manager):
 
-- **UniversalTelegramBot** (v1.5.0)
-- **ArduinoJson** (v6.21.0)
+- **UniversalTelegramBot** (v1.3.0)
+- **ArduinoJson** (v6.7.2)
 
 ---
 
