@@ -1,0 +1,2628 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>Smart Twin • OSKEMEN (HackOS 1.0)</title>
+
+  <!-- Leaflet (2D карта) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+  <style>
+    :root{
+      --bg:#070a12;
+      --panel:rgba(255,255,255,.06);
+      --panel2:rgba(255,255,255,.08);
+      --stroke:rgba(255,255,255,.12);
+      --text:rgba(255,255,255,.86);
+      --muted:rgba(255,255,255,.58);
+      --good:#44ffb2;
+      --warn:#ffd36a;
+      --bad:#ff5a7a;
+      --accent:#7c5cff;
+      --accent2:#2ee0ff;
+      --shadow: 0 24px 70px rgba(0,0,0,.55);
+      --r: 18px;
+      --r2: 26px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      background:
+        radial-gradient(1200px 800px at 18% 15%, rgba(124,92,255,.22), transparent 55%),
+        radial-gradient(900px 600px at 80% 30%, rgba(46,224,255,.14), transparent 55%),
+        radial-gradient(900px 700px at 50% 85%, rgba(68,255,178,.10), transparent 55%),
+        linear-gradient(180deg, #050712, #070a12 55%, #050711);
+      color:var(--text);
+      overflow:hidden;
+    }
+
+    /* ====== Layout ====== */
+    .app{
+      height:100%;
+      display:grid;
+      grid-template-columns: 320px 1fr;
+      gap:18px;
+      padding:18px;
+    }
+    .sidebar{
+      border:1px solid var(--stroke);
+      background: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.04));
+      border-radius: var(--r2);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+      position:relative;
+    }
+    .sidebar::before{
+      content:"";
+      position:absolute; inset:-120px -120px auto auto;
+      width:260px; height:260px;
+      background: radial-gradient(circle at 35% 35%, rgba(124,92,255,.45), transparent 58%);
+      filter: blur(0px);
+      opacity:.7;
+      pointer-events:none;
+      transform: rotate(12deg);
+    }
+    .brand{
+      padding:18px 18px 12px;
+      display:flex; align-items:center; gap:12px;
+      border-bottom:1px solid var(--stroke);
+      position:relative;
+    }
+    .logo{
+      width:42px; height:42px; border-radius:14px;
+      background: radial-gradient(circle at 30% 30%, rgba(46,224,255,.95), rgba(124,92,255,.85) 55%, rgba(0,0,0,.0) 100%);
+      box-shadow: 0 18px 40px rgba(124,92,255,.25);
+      border:1px solid rgba(255,255,255,.16);
+      position:relative;
+      overflow:hidden;
+    }
+    .logo::after{
+      content:"";
+      position:absolute; inset:-40%;
+      background: conic-gradient(from 90deg, rgba(255,255,255,.0), rgba(255,255,255,.24), rgba(255,255,255,.0));
+      animation: shimmer 3.2s linear infinite;
+      opacity:.9;
+    }
+    @keyframes shimmer{to{transform:rotate(360deg)}}
+    .brand h1{
+      margin:0;
+      font-size:14px;
+      letter-spacing:.18em;
+      text-transform:uppercase;
+      line-height:1.1;
+    }
+    .brand .sub{
+      font-size:12px; color:var(--muted);
+      letter-spacing:.06em;
+      margin-top:2px;
+    }
+
+    .nav{
+      padding:10px;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+    .nav button{
+      all:unset;
+      cursor:pointer;
+      padding:12px 12px;
+      border-radius: 14px;
+      border:1px solid transparent;
+      display:flex; align-items:center; justify-content:space-between;
+      background: rgba(255,255,255,.03);
+      transition: transform .18s ease, background .18s ease, border-color .18s ease;
+      position:relative;
+      overflow:hidden;
+    }
+    .nav button:hover{
+      transform: translateY(-1px);
+      background: rgba(255,255,255,.05);
+      border-color: rgba(255,255,255,.10);
+    }
+    .nav button.active{
+      background: linear-gradient(90deg, rgba(124,92,255,.22), rgba(46,224,255,.12));
+      border-color: rgba(124,92,255,.35);
+      box-shadow: 0 18px 45px rgba(124,92,255,.18);
+    }
+    .nav .left{
+      display:flex; align-items:center; gap:10px;
+      min-width:0;
+    }
+    .ico{
+      width:30px; height:30px; border-radius:12px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.05);
+      display:grid; place-items:center;
+      flex: 0 0 auto;
+    }
+    .ico svg{width:16px; height:16px; opacity:.92}
+    .nav .label{
+      display:flex; flex-direction:column;
+      min-width:0;
+    }
+    .nav .label b{
+      font-size:13px;
+      letter-spacing:.02em;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .nav .label span{
+      font-size:11px; color:var(--muted);
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      margin-top:2px;
+    }
+    .pill{
+      font-size:11px;
+      color: rgba(255,255,255,.9);
+      background: rgba(255,255,255,.08);
+      border:1px solid rgba(255,255,255,.10);
+      padding:6px 10px;
+      border-radius: 999px;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+    }
+
+    .sidebarFooter{
+      margin-top:auto;
+      padding:14px 16px 16px;
+      border-top:1px solid var(--stroke);
+      color:var(--muted);
+      font-size:12px;
+      display:flex; gap:10px; align-items:center; justify-content:space-between;
+    }
+    .dotLive{
+      width:8px;height:8px;border-radius:999px;background:var(--good);
+      box-shadow:0 0 0 6px rgba(68,255,178,.10);
+      animation: pulse 1.6s ease-in-out infinite;
+    }
+    @keyframes pulse{
+      0%,100%{transform:scale(1); opacity:.9}
+      50%{transform:scale(1.15); opacity:1}
+    }
+
+    /* ====== Main area ====== */
+    .main{
+      border-radius: var(--r2);
+      border:1px solid var(--stroke);
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+      box-shadow: var(--shadow);
+      overflow:hidden;
+      position:relative;
+    }
+    .topbar{
+      display:flex; align-items:center; justify-content:space-between;
+      padding:14px 16px;
+      border-bottom: 1px solid var(--stroke);
+      background: rgba(0,0,0,.12);
+    }
+    .topbar .title{
+      display:flex; flex-direction:column;
+    }
+    .topbar .title h2{
+      margin:0;
+      font-size:14px;
+      letter-spacing:.16em;
+      text-transform:uppercase;
+    }
+    .topbar .title span{
+      margin-top:4px;
+      font-size:12px;
+      color:var(--muted);
+    }
+    .topbar .actions{
+      display:flex; gap:10px; align-items:center;
+    }
+    .btn{
+      cursor:pointer;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.06);
+      color:var(--text);
+      padding:10px 12px;
+      border-radius: 14px;
+      font-size:12px;
+      letter-spacing:.06em;
+      transition: transform .18s ease, background .18s ease, border-color .18s ease;
+      display:flex; gap:8px; align-items:center;
+      user-select:none;
+    }
+    .btn:hover{
+      transform: translateY(-1px);
+      background: rgba(255,255,255,.09);
+      border-color: rgba(255,255,255,.22);
+    }
+    .btn.primary{
+      border-color: rgba(124,92,255,.45);
+      background: linear-gradient(90deg, rgba(124,92,255,.22), rgba(46,224,255,.12));
+    }
+    .btn.danger{
+      border-color: rgba(255,90,122,.45);
+      background: rgba(255,90,122,.08);
+    }
+    .btn.small{padding:8px 10px;border-radius:12px}
+    .kbd{
+      font-size:11px;
+      color:rgba(255,255,255,.75);
+      border:1px solid rgba(255,255,255,.16);
+      background: rgba(0,0,0,.14);
+      padding:3px 7px;
+      border-radius: 10px;
+    }
+
+    .content{
+      height: calc(100% - 58px);
+      display:none;
+    }
+    .content.active{display:block}
+
+    /* ====== Home ====== */
+    .grid{
+      height:100%;
+      display:grid;
+      grid-template-columns: 1.25fr .75fr;
+      gap:16px;
+      padding:16px;
+    }
+    .card{
+      border:1px solid var(--stroke);
+      background: rgba(255,255,255,.05);
+      border-radius: var(--r2);
+      box-shadow: 0 18px 60px rgba(0,0,0,.25);
+      overflow:hidden;
+      position:relative;
+    }
+    .cardHeader{
+      padding:14px 14px 10px;
+      display:flex; justify-content:space-between; align-items:flex-start;
+      gap:10px;
+      border-bottom: 1px solid rgba(255,255,255,.09);
+      background: rgba(0,0,0,.10);
+    }
+    .cardHeader h3{
+      margin:0;
+      font-size:13px;
+      letter-spacing:.12em;
+      text-transform:uppercase;
+    }
+    .cardHeader p{
+      margin:6px 0 0;
+      font-size:12px;
+      color:var(--muted);
+      line-height:1.35;
+      max-width:60ch;
+    }
+    .cardBody{padding:14px}
+    .hero{
+      display:grid;
+      grid-template-rows: auto 1fr;
+      height:100%;
+    }
+    .heroTop{
+      padding:14px 14px 0;
+      display:flex; gap:12px; align-items:flex-start; justify-content:space-between;
+    }
+    .heroTop .big{
+      font-size:18px;
+      margin:0;
+      letter-spacing:.04em;
+      line-height:1.25;
+    }
+    .heroTop .big span{
+      background: linear-gradient(90deg, rgba(46,224,255,.95), rgba(124,92,255,.95));
+      -webkit-background-clip:text;
+      background-clip:text;
+      color:transparent;
+      font-weight:800;
+    }
+    .heroTop .meta{
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.35;
+      max-width:64ch;
+      margin-top:8px;
+    }
+    .miniCity{
+      position:relative;
+      height:100%;
+      min-height: 380px;
+    }
+    #threeHome{
+      width:100%;
+      height:100%;
+      display:block;
+      border-radius: var(--r2);
+      border:1px solid rgba(255,255,255,.10);
+      background: radial-gradient(600px 500px at 20% 30%, rgba(124,92,255,.16), transparent 60%),
+                  radial-gradient(520px 440px at 80% 50%, rgba(46,224,255,.10), transparent 55%),
+                  rgba(0,0,0,.22);
+    }
+    .overlayHint{
+      position:absolute;
+      left:14px;
+      bottom:14px;
+      right:14px;
+      display:flex;
+      gap:10px;
+      align-items:center;
+      justify-content:space-between;
+      pointer-events:none;
+    }
+    .hintBadge{
+      pointer-events:none;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(0,0,0,.22);
+      padding:10px 12px;
+      border-radius: 14px;
+      font-size:12px;
+      color:rgba(255,255,255,.82);
+      backdrop-filter: blur(10px);
+      max-width: 72ch;
+    }
+    .hintBadge b{color:white}
+    .kpis{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:12px;
+      padding:14px;
+    }
+    .kpi{
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.04);
+      border-radius: 18px;
+      padding:12px;
+      position:relative;
+      overflow:hidden;
+    }
+    .kpi::before{
+      content:"";
+      position:absolute; inset:-40% -40% auto auto;
+      width:160px;height:160px;
+      background: radial-gradient(circle at 35% 35%, rgba(46,224,255,.20), transparent 60%);
+      transform: rotate(20deg);
+      pointer-events:none;
+    }
+    .kpi .name{font-size:11px; color:var(--muted); letter-spacing:.12em; text-transform:uppercase}
+    .kpi .value{margin-top:6px; font-size:22px; font-weight:800; letter-spacing:.02em}
+    .kpi .delta{margin-top:6px; font-size:12px; color:var(--muted)}
+    .delta .pos{color:var(--good)}
+    .delta .neg{color:var(--bad)}
+    .delta .mid{color:var(--warn)}
+
+    /* ====== Map Studio ====== */
+    .mapWrap{
+      height:100%;
+      display:grid;
+      grid-template-columns: 1fr 380px;
+      gap:16px;
+      padding:16px;
+    }
+    .mapCard{height:100%}
+    #map{
+      width:100%;
+      height:100%;
+      min-height: 520px;
+    }
+    .panel{
+      height:100%;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+    }
+    .panel .section{
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.04);
+      border-radius: var(--r2);
+      padding:12px;
+    }
+    .section h4{
+      margin:0;
+      font-size:12px;
+      letter-spacing:.14em;
+      text-transform:uppercase;
+    }
+    .section p{
+      margin:8px 0 0;
+      font-size:12px;
+      color:var(--muted);
+      line-height:1.35;
+    }
+    .row{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      justify-content:space-between;
+      margin-top:10px;
+      flex-wrap:wrap;
+    }
+    label{
+      font-size:12px; color:var(--muted);
+    }
+    select,input[type="range"],input[type="number"]{
+      width:100%;
+      padding:10px 10px;
+      border-radius: 14px;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(0,0,0,.18);
+      color: var(--text);
+      outline:none;
+    }
+    input[type="range"]{padding:10px 0}
+    .twoCols{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:10px;
+      margin-top:10px;
+    }
+    .tagline{
+      display:flex;
+      gap:8px;
+      align-items:center;
+      flex-wrap:wrap;
+      margin-top:8px;
+    }
+    .chip{
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.05);
+      padding:6px 10px;
+      border-radius: 999px;
+      font-size:11px;
+      color:rgba(255,255,255,.8);
+    }
+    .chip.good{border-color: rgba(68,255,178,.35); background: rgba(68,255,178,.08)}
+    .chip.warn{border-color: rgba(255,211,106,.35); background: rgba(255,211,106,.07)}
+    .chip.bad{border-color: rgba(255,90,122,.35); background: rgba(255,90,122,.08)}
+    .smallNote{font-size:11px;color:var(--muted);line-height:1.35;margin-top:10px}
+    .divider{height:1px;background:rgba(255,255,255,.10);margin:10px 0}
+
+    /* ====== Scenario Lab ====== */
+    .lab{
+      height:100%;
+      display:grid;
+      grid-template-columns: 1fr 420px;
+      gap:16px;
+      padding:16px;
+    }
+    .charts{
+      display:grid;
+      grid-template-rows: 1fr 1fr;
+      gap:16px;
+      height:100%;
+    }
+    .chartCanvas{
+      width:100%;
+      height:100%;
+      min-height: 260px;
+      display:block;
+      border-radius: var(--r2);
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.18);
+    }
+    .list{
+      margin-top:10px;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      max-height: 260px;
+      overflow:auto;
+      padding-right:6px;
+    }
+    .item{
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.04);
+      border-radius: 16px;
+      padding:10px;
+      display:flex; gap:10px; align-items:flex-start; justify-content:space-between;
+    }
+    .item b{font-size:12px}
+    .item span{font-size:11px;color:var(--muted);display:block;margin-top:4px;line-height:1.3}
+
+    /* ====== Report ====== */
+    .report{
+      height:100%;
+      display:grid;
+      grid-template-columns: 1fr 420px;
+      gap:16px;
+      padding:16px;
+    }
+    textarea{
+      width:100%;
+      height:100%;
+      min-height: 420px;
+      resize:none;
+      padding:14px;
+      border-radius: var(--r2);
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(0,0,0,.18);
+      color: var(--text);
+      outline:none;
+      line-height:1.45;
+      font-size:12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace;
+    }
+    .mono{
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace;
+      font-size:12px;
+      color:rgba(255,255,255,.82);
+      line-height:1.45;
+    }
+
+    /* ====== Responsive ====== */
+    @media (max-width: 1100px){
+      body{overflow:auto}
+      .app{grid-template-columns:1fr; height:auto}
+      .main{height: calc(100vh - 18px)}
+      .mapWrap,.lab,.report{grid-template-columns:1fr}
+      .sidebar{position:sticky; top:18px}
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <!-- ===== SIDEBAR ===== -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="logo" aria-hidden="true"></div>
+        <div>
+          <h1>SMART TWIN</h1>
+          <div class="sub">OSKEMEN • HackOS 1.0</div>
+        </div>
+      </div>
+
+      <div class="nav" id="nav">
+        <button class="active" data-tab="home">
+          <div class="left">
+            <div class="ico" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5Z" stroke="currentColor" stroke-width="1.6" />
+              </svg>
+            </div>
+            <div class="label">
+              <b>Overview</b>
+              <span>3D город + KPI в реальном времени</span>
+            </div>
+          </div>
+          <span class="pill">LIVE</span>
+        </button>
+
+        <button data-tab="mapstudio">
+          <div class="left">
+            <div class="ico" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M10 18 4 20V6l6-2 4 2 6-2v14l-6 2-4-2Z" stroke="currentColor" stroke-width="1.6" />
+                <path d="M10 4v14M14 6v14" stroke="currentColor" stroke-width="1.6" opacity=".8"/>
+              </svg>
+            </div>
+            <div class="label">
+              <b>Map Studio</b>
+              <span>ставь объекты на свободные участки</span>
+            </div>
+          </div>
+          <span class="pill">REQ</span>
+        </button>
+
+        <button data-tab="lab">
+          <div class="left">
+            <div class="ico" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M7 3v6l-3 9a3 3 0 0 0 2.84 4h10.32A3 3 0 0 0 20 18l-3-9V3" stroke="currentColor" stroke-width="1.6"/>
+                <path d="M8 9h8" stroke="currentColor" stroke-width="1.6" opacity=".8"/>
+              </svg>
+            </div>
+            <div class="label">
+              <b>Scenario Lab</b>
+              <span>what-if: пробки, экология, потоки людей</span>
+            </div>
+          </div>
+          <span class="pill">SIM</span>
+        </button>
+
+        <button data-tab="report">
+          <div class="left">
+            <div class="ico" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M7 3h7l3 3v15a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" stroke="currentColor" stroke-width="1.6"/>
+                <path d="M14 3v4h4" stroke="currentColor" stroke-width="1.6" opacity=".8"/>
+                <path d="M8 12h8M8 16h8" stroke="currentColor" stroke-width="1.6" opacity=".8"/>
+              </svg>
+            </div>
+            <div class="label">
+              <b>Report</b>
+              <span>авто-отчёт + экспорт сценария</span>
+            </div>
+          </div>
+          <span class="pill">PDF?</span>
+        </button>
+      </div>
+
+      <div class="sidebarFooter">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span class="dotLive" aria-hidden="true"></span>
+          <span>модель-симулятор локально (без сервера)</span>
+        </div>
+        <span class="kbd">H</span>
+      </div>
+    </aside>
+
+    <!-- ===== MAIN ===== -->
+    <main class="main">
+      <div class="topbar">
+        <div class="title">
+          <h2 id="topTitle">Overview</h2>
+          <span id="topSubtitle">цифровой двойник района: поставь объект → смотри последствия</span>
+        </div>
+        <div class="actions">
+          <button class="btn small" id="btnUndo" title="Отменить последнее действие (U)">
+            ↩ <span style="opacity:.85">Undo</span> <span class="kbd">U</span>
+          </button>
+          <button class="btn small danger" id="btnReset" title="Сбросить всё (R)">
+            ⟲ <span style="opacity:.85">Reset</span> <span class="kbd">R</span>
+          </button>
+          <button class="btn small primary" id="btnExport" title="Экспортировать сценарий">
+            ⤓ <span style="opacity:.85">Export</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- ===== TAB: HOME ===== -->
+      <section class="content active" id="tab-home">
+        <div class="grid">
+          <div class="card hero">
+            <div class="heroTop">
+              <div>
+                <p class="big">
+                  <span>Smart Twin</span> — интерактивный цифровой двойник района<br/>
+                  (строишь → сразу видишь эффект)
+                </p>
+                <div class="meta">
+                  Фокус кейса: моделирование изменений инфраструктуры, анализ транспорта, прогноз экологии,
+                  визуализация результатом графиками + картой + 3D.
+                  <br/><br/>
+                  <b>Подсказка:</b> открой <b>Map Studio</b>, кликни на <b>свободный участок</b> и поставь парк/дом/школу/завод.
+                </div>
+              </div>
+              <div class="tagline">
+                <span class="chip good">3D визуализация</span>
+                <span class="chip warn">what-if симуляция</span>
+                <span class="chip">интерактивная карта</span>
+              </div>
+            </div>
+
+            <div class="cardBody miniCity">
+              <canvas id="threeHome"></canvas>
+              <div class="overlayHint">
+                <div class="hintBadge">
+                  <b>Живой 3D-район:</b> здания, парки и “потоки” меняются от сценария.
+                  Симуляция упрощённая (MVP), но выглядит “как продукт”.
+                </div>
+                <div class="hintBadge" style="max-width:340px">
+                  Горячие клавиши: <b>H</b> Home, <b>M</b> Map, <b>L</b> Lab, <b>U</b> Undo, <b>R</b> Reset
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="cardHeader">
+              <div>
+                <h3>City Pulse</h3>
+                <p>Ключевые индикаторы (обновляются после каждого изменения на карте)</p>
+              </div>
+              <span class="pill" id="scenarioName">SCENARIO • A</span>
+            </div>
+
+            <div class="kpis">
+              <div class="kpi">
+                <div class="name">Traffic / Congestion</div>
+                <div class="value" id="kpiTraffic">—</div>
+                <div class="delta" id="kpiTrafficDelta">—</div>
+              </div>
+              <div class="kpi">
+                <div class="name">Air Quality (AQI-like)</div>
+                <div class="value" id="kpiAir">—</div>
+                <div class="delta" id="kpiAirDelta">—</div>
+              </div>
+              <div class="kpi">
+                <div class="name">Footfall / People flow</div>
+                <div class="value" id="kpiFoot">—</div>
+                <div class="delta" id="kpiFootDelta">—</div>
+              </div>
+              <div class="kpi">
+                <div class="name">Budget Efficiency</div>
+                <div class="value" id="kpiBudget">—</div>
+                <div class="delta" id="kpiBudgetDelta">—</div>
+              </div>
+            </div>
+
+            <div class="cardBody">
+              <div class="divider"></div>
+              <div class="mono" id="miniNarrative"></div>
+              <div class="smallNote">
+                ⚠️ Это демонстрационный симулятор для хакатона: формулы простые, но
+                <b>показательно объясняют причинно-следственные связи</b> (что будет если…).
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== TAB: MAP STUDIO (REQUIRED) ===== -->
+      <section class="content" id="tab-mapstudio">
+        <div class="mapWrap">
+          <div class="card mapCard">
+            <div class="cardHeader">
+              <div>
+                <h3>Map Studio</h3>
+                <p>Свободные участки подсвечены. Клик → поставить объект → увидеть прогноз.</p>
+              </div>
+              <span class="pill" id="freeCountPill">FREE: —</span>
+            </div>
+            <div class="cardBody" style="padding:0;height:calc(100% - 66px)">
+              <div id="map"></div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="section">
+              <h4>Placement</h4>
+              <p id="selectedInfo">Выбери свободный участок на карте (зелёный контур).</p>
+
+              <div class="divider"></div>
+
+              <label>Тип объекта</label>
+              <select id="objectType">
+                <option value="park">Парк / зелёная зона</option>
+                <option value="residential">Жилой комплекс</option>
+                <option value="school">Школа / образование</option>
+                <option value="sports">Спорткомплекс</option>
+                <option value="industry">Промобъект</option>
+                <option value="bridge">Мост / связь</option>
+              </select>
+
+              <div class="twoCols">
+                <div>
+                  <label>Масштаб (условно)</label>
+                  <input id="scale" type="range" min="1" max="5" step="1" value="3"/>
+                </div>
+                <div>
+                  <label>Приоритет “экология”</label>
+                  <input id="ecoPolicy" type="range" min="0" max="100" step="5" value="55"/>
+                </div>
+              </div>
+
+              <div class="row">
+                <button class="btn primary" id="btnPlace">＋ Place</button>
+                <button class="btn" id="btnClearSelection">✕ Clear</button>
+              </div>
+
+              <div class="smallNote">
+                “Приоритет экологии” влияет на эффективность мер (например, фильтры на заводе или озеленение).
+              </div>
+            </div>
+
+            <div class="section">
+              <h4>Road actions</h4>
+              <p>Сценарий “закрытие дороги” (имитация ремонта/перекрытия) меняет пробки и потоки.</p>
+
+              <label>Сила перекрытия</label>
+              <input id="roadClosure" type="range" min="0" max="100" step="5" value="25"/>
+              <div class="tagline" style="margin-top:10px">
+                <span class="chip warn" id="closureChip">closure: 25%</span>
+                <span class="chip" id="detourChip">detours: auto</span>
+              </div>
+
+              <div class="row">
+                <button class="btn" id="btnToggleClosure">🛑 Draw closure</button>
+                <button class="btn" id="btnClearClosure">🧹 Clear</button>
+              </div>
+
+              <div class="smallNote">
+                Нажми “Draw closure” и кликни 2–3 точки на карте, чтобы нарисовать коридор закрытия.
+                Симулятор сам увеличит пробки и “перетечёт” потоки.
+              </div>
+            </div>
+
+            <div class="section">
+              <h4>Legend</h4>
+              <div class="tagline">
+                <span class="chip good">Свободно</span>
+                <span class="chip">Занято</span>
+                <span class="chip bad">Перекрытие</span>
+              </div>
+              <div class="smallNote">
+                При добавлении объектов обновляются KPI, графики и 3D-район на главной.
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== TAB: LAB ===== -->
+      <section class="content" id="tab-lab">
+        <div class="lab">
+          <div class="charts">
+            <div class="card">
+              <div class="cardHeader">
+                <div>
+                  <h3>Impact Timeline</h3>
+                  <p>Как меняются индикаторы по “условным дням” после внедрения решения.</p>
+                </div>
+                <span class="pill">14 DAYS</span>
+              </div>
+              <div class="cardBody">
+                <canvas class="chartCanvas" id="chartTimeline"></canvas>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="cardHeader">
+                <div>
+                  <h3>Impact Breakdown</h3>
+                  <p>Вклад объектов: трафик / экология / притяжение людей.</p>
+                </div>
+                <span class="pill">KPI MIX</span>
+              </div>
+              <div class="cardBody">
+                <canvas class="chartCanvas" id="chartBreakdown"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="cardHeader">
+              <div>
+                <h3>Scenario Inspector</h3>
+                <p>Список добавленных объектов и локальные эффекты.</p>
+              </div>
+              <span class="pill" id="objectsPill">OBJECTS: 0</span>
+            </div>
+            <div class="cardBody">
+              <div class="section" style="padding:12px; margin-bottom:12px">
+                <h4>Quick knobs</h4>
+                <p>Один ползунок — и видно изменение всего города.</p>
+                <label>Спрос населения (рост/миграция)</label>
+                <input id="demand" type="range" min="80" max="140" step="5" value="105"/>
+                <div class="tagline">
+                  <span class="chip" id="demandChip">demand: 105%</span>
+                  <span class="chip" id="policyChip">eco-policy: 55%</span>
+                </div>
+
+                <div class="divider"></div>
+
+                <div class="row">
+                  <button class="btn" id="btnRecompute">↻ Recompute</button>
+                  <button class="btn primary" id="btnAutoStory">✨ Auto story</button>
+                </div>
+                <div class="smallNote">
+                  “Auto story” сгенерирует человеческое описание: что поменялось и почему.
+                </div>
+              </div>
+
+              <div class="divider"></div>
+
+              <div class="list" id="objectsList"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== TAB: REPORT ===== -->
+      <section class="content" id="tab-report">
+        <div class="report">
+          <div class="card">
+            <div class="cardHeader">
+              <div>
+                <h3>Analytical Report</h3>
+                <p>Автоматическая сводка для принятия решений + экспорт.</p>
+              </div>
+              <span class="pill">AUTO</span>
+            </div>
+            <div class="cardBody" style="height:calc(100% - 66px)">
+              <textarea id="reportText" spellcheck="false"></textarea>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="section">
+              <h4>Export</h4>
+              <p>Сохрани сценарий, чтобы показать жюри (или продолжить на другом ноуте).</p>
+              <div class="row">
+                <button class="btn primary" id="btnDownloadJSON">⤓ Scenario JSON</button>
+                <button class="btn" id="btnDownloadHTML">⤓ Report HTML</button>
+              </div>
+              <div class="smallNote">
+                Для “PDF” на хакатоне: скачай HTML → открой в браузере → Ctrl+P → Save as PDF.
+              </div>
+            </div>
+
+            <div class="section">
+              <h4>Pitch bullets</h4>
+              <p>Коротко, как это продавать:</p>
+              <div class="mono" id="pitchBullets"></div>
+            </div>
+
+            <div class="section">
+              <h4>Data snapshot</h4>
+              <p>Текущее состояние модели (для дебага и демонстрации).</p>
+              <div class="mono" id="dataSnapshot"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Three.js (3D визуализация) -->
+  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+
+  <script>
+    /*****************************************************************
+     * SMART TWIN • Single-file MVP for HackOS 1.0
+     * - Required tabs: Overview + Map Studio
+     * - 2D map (Leaflet) with parcels: free/occupied
+     * - Place objects on parcels → recompute KPI (traffic/air/footfall/budget)
+     * - Road closure drawing → increases congestion, shifts flows
+     * - 3D mini-city (Three.js) reflects objects & “flows”
+     * - Scenario lab charts + auto report
+     *****************************************************************/
+
+    /* =========================
+       Utilities
+    ========================= */
+    const clamp = (v,min,max)=>Math.max(min,Math.min(max,v));
+    const lerp  = (a,b,t)=>a+(b-a)*t;
+    const rnd   = (a,b)=>a+Math.random()*(b-a);
+    const fmt   = (n, d=0)=>Number(n).toFixed(d);
+    const pct   = (n)=>`${fmt(n,0)}%`;
+
+    function colorForDelta(d){
+      if (d > 2) return "pos";
+      if (d < -2) return "neg";
+      return "mid";
+    }
+
+    function downloadBlob(filename, blob){
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    /* =========================
+       Model: objects and impacts
+    ========================= */
+    const OBJECT_META = {
+      park: {
+        label:"Парк",
+        cost:[30, 60, 90, 120, 150],
+        traffic:+(-6),    // reduces congestion a bit (cooling effect)
+        air:+(-14),       // improves air
+        foot:+(+18),      // attracts people
+        note:"озеленение снижает загрязнение и повышает притяжение",
+      },
+      residential: {
+        label:"Жилой комплекс",
+        cost:[50, 90, 140, 190, 240],
+        traffic:+(+16),
+        air:+(+6),
+        foot:+(+10),
+        note:"рост жителей повышает трафик и немного ухудшает воздух",
+      },
+      school: {
+        label:"Школа",
+        cost:[40, 75, 110, 150, 190],
+        traffic:+(+10),
+        air:+(+2),
+        foot:+(+14),
+        note:"утренние/вечерние пики + рост потоков людей",
+      },
+      sports: {
+        label:"Спорткомплекс",
+        cost:[45, 85, 120, 170, 220],
+        traffic:+(+8),
+        air:+(+1),
+        foot:+(+16),
+        note:"вечерние события увеличивают потоки, трафик умеренно растёт",
+      },
+      industry: {
+        label:"Промобъект",
+        cost:[70, 120, 180, 260, 340],
+        traffic:+(+18),
+        air:+(+18),
+        foot:+(+6),
+        note:"рабочие места + логистика; риск ухудшения экологии",
+      },
+      bridge: {
+        label:"Мост/связь",
+        cost:[80, 140, 220, 320, 420],
+        traffic:+(-18),  // relieves congestion
+        air:+(-2),
+        foot:+(+6),
+        note:"снимает бутылочные горлышки и сокращает лишние объезды",
+      }
+    };
+
+    /* =========================
+       App State
+    ========================= */
+    const state = {
+      scenarioId: "A",
+      // Baselines (условные)
+      base: {
+        traffic: 52, // 0..100 (higher = worse congestion)
+        air: 58,     // 0..100 (higher = worse air)
+        foot: 48,    // 0..100 (higher = more people flows)
+        budget: 60   // 0..100 (higher = better efficiency)
+      },
+      // Policy knobs
+      demand: 105,     // %
+      ecoPolicy: 55,   // %
+      roadClosure: 25, // %
+      // Map parcels and placed objects
+      parcels: [],     // filled later
+      placed: [],      // list of {id, parcelId, type, scale, latlng}
+      // Road closure polyline
+      closurePoints: [],
+      isDrawingClosure: false,
+      // History for undo
+      history: [],
+      // Derived KPIs (computed)
+      kpi: {traffic:0, air:0, foot:0, budget:0},
+      kpiDelta: {traffic:0, air:0, foot:0, budget:0},
+      story: ""
+    };
+
+    function pushHistory(){
+      // keep small snapshots
+      const snap = JSON.stringify({
+        parcels: state.parcels,
+        placed: state.placed,
+        closurePoints: state.closurePoints,
+        isDrawingClosure: false,
+        ecoPolicy: state.ecoPolicy,
+        roadClosure: state.roadClosure,
+        demand: state.demand
+      });
+      state.history.push(snap);
+      if (state.history.length > 30) state.history.shift();
+    }
+
+    function undo(){
+      const last = state.history.pop();
+      if (!last) return;
+      const snap = JSON.parse(last);
+      state.parcels = snap.parcels;
+      state.placed = snap.placed;
+      state.closurePoints = snap.closurePoints;
+      state.isDrawingClosure = false;
+      state.ecoPolicy = snap.ecoPolicy;
+      state.roadClosure = snap.roadClosure;
+      state.demand = snap.demand;
+
+      // UI sync for sliders
+      document.getElementById("ecoPolicy").value = state.ecoPolicy;
+      document.getElementById("roadClosure").value = state.roadClosure;
+      document.getElementById("demand").value = state.demand;
+
+      refreshMapLayers();
+      recomputeAll(true);
+    }
+
+    function resetAll(){
+      pushHistory();
+      // reset parcels (free/occupied)
+      initParcels(true);
+      state.placed = [];
+      state.closurePoints = [];
+      state.isDrawingClosure = false;
+      state.ecoPolicy = 55;
+      state.roadClosure = 25;
+      state.demand = 105;
+
+      document.getElementById("ecoPolicy").value = state.ecoPolicy;
+      document.getElementById("roadClosure").value = state.roadClosure;
+      document.getElementById("demand").value = state.demand;
+
+      clearSelection();
+      refreshMapLayers();
+      recomputeAll(true);
+    }
+
+    /* =========================
+       Tabs / Navigation
+    ========================= */
+    const tabMeta = {
+      home: {
+        title:"Overview",
+        sub:"цифровой двойник района: поставь объект → смотри последствия"
+      },
+      mapstudio: {
+        title:"Map Studio",
+        sub:"что будет если… добавить парк/дом/школу/объект? (свободные участки подсвечены)"
+      },
+      lab: {
+        title:"Scenario Lab",
+        sub:"графики, разбор влияния и быстрые регуляторы (demand, eco-policy)"
+      },
+      report: {
+        title:"Report",
+        sub:"генерация аналитической сводки и экспорт для жюри"
+      }
+    };
+
+    function setActiveTab(tab){
+      // nav
+      document.querySelectorAll("#nav button").forEach(b=>{
+        b.classList.toggle("active", b.dataset.tab === tab);
+      });
+      // content
+      document.querySelectorAll(".content").forEach(c=>{
+        c.classList.toggle("active", c.id === "tab-"+tab);
+      });
+      // topbar title
+      document.getElementById("topTitle").textContent = tabMeta[tab].title;
+      document.getElementById("topSubtitle").textContent = tabMeta[tab].sub;
+
+      // map invalidate size when shown
+      if (tab === "mapstudio" && window._map) setTimeout(()=>window._map.invalidateSize(), 80);
+      if (tab === "lab") drawCharts();
+      if (tab === "report") refreshReport();
+    }
+
+    document.getElementById("nav").addEventListener("click", (e)=>{
+      const btn = e.target.closest("button[data-tab]");
+      if (!btn) return;
+      setActiveTab(btn.dataset.tab);
+    });
+
+    // hotkeys
+    window.addEventListener("keydown", (e)=>{
+      if (e.target && ["INPUT","TEXTAREA","SELECT"].includes(e.target.tagName)) return;
+      const k = e.key.toLowerCase();
+      if (k === "h") setActiveTab("home");
+      if (k === "m") setActiveTab("mapstudio");
+      if (k === "l") setActiveTab("lab");
+      if (k === "u") undo();
+      if (k === "r") resetAll();
+    });
+
+    /* =========================
+       Leaflet Map: parcels + placement
+    ========================= */
+    let selectedParcelId = null;
+
+    const mapLayers = {
+      parcels: null,
+      markers: null,
+      closureLine: null,
+      closureDots: null
+    };
+
+    function initMap(){
+      const oskemen = [49.948, 82.628]; // approx center
+      const map = L.map("map", {zoomControl:true}).setView(oskemen, 13);
+
+      // Dark-ish tiles (CartoDB Dark Matter)
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap & CARTO'
+      }).addTo(map);
+
+      window._map = map;
+
+      mapLayers.parcels = L.layerGroup().addTo(map);
+      mapLayers.markers = L.layerGroup().addTo(map);
+      mapLayers.closureDots = L.layerGroup().addTo(map);
+
+      // closure polyline
+      mapLayers.closureLine = L.polyline([], {
+        color:"#ff5a7a",
+        weight:6,
+        opacity:0.8
+      }).addTo(map);
+
+      // click to add closure points when drawing
+      map.on("click", (ev)=>{
+        if (!state.isDrawingClosure) return;
+        pushHistory();
+        state.closurePoints.push(ev.latlng);
+        refreshClosure();
+        recomputeAll(true);
+      });
+
+      initParcels(false);
+      refreshMapLayers();
+      refreshClosure();
+
+      // initial compute
+      recomputeAll(true);
+    }
+
+    function initParcels(forceReset){
+      // Create a grid of rectangles around city center (simplified)
+      const center = [49.948, 82.628];
+      const rows = 6, cols = 6;
+      const latStep = 0.006;  // ~600m
+      const lngStep = 0.010;  // ~700m at this latitude
+      const startLat = center[0] - (rows/2)*latStep;
+      const startLng = center[1] - (cols/2)*lngStep;
+
+      const parcels = [];
+      let id = 1;
+
+      // deterministic “occupied pattern”
+      const seedPattern = [
+        1,0,1,0,0,1,
+        0,0,1,0,1,0,
+        1,0,0,0,1,0,
+        0,1,0,1,0,0,
+        0,0,1,0,0,1,
+        1,0,0,1,0,0
+      ];
+
+      for (let r=0;r<rows;r++){
+        for (let c=0;c<cols;c++){
+          const lat1 = startLat + r*latStep;
+          const lng1 = startLng + c*lngStep;
+          const lat2 = lat1 + latStep*0.85;
+          const lng2 = lng1 + lngStep*0.85;
+
+          const occupied = seedPattern[(r*cols+c) % seedPattern.length] === 1;
+
+          parcels.push({
+            id: "P"+id++,
+            bounds: [[lat1,lng1],[lat2,lng2]],
+            occupied: occupied, // occupied means not free for placing in MVP
+            baseType: occupied ? (Math.random()>0.5 ? "residential":"industry") : null
+          });
+        }
+      }
+
+      if (forceReset || state.parcels.length === 0) state.parcels = parcels;
+    }
+
+    function parcelStyle(parcel){
+      const free = !parcel.occupied;
+      const selected = selectedParcelId === parcel.id;
+      return {
+        color: free ? "#44ffb2" : "rgba(255,255,255,.35)",
+        weight: selected ? 4 : (free ? 3 : 2),
+        opacity: free ? 0.95 : 0.7,
+        fillColor: free ? "rgba(68,255,178,.16)" : "rgba(255,255,255,.08)",
+        fillOpacity: free ? 0.12 : 0.10,
+        dashArray: free ? (selected ? null : "6 8") : "2 10",
+        lineJoin: "round"
+      };
+    }
+
+    function refreshMapLayers(){
+      mapLayers.parcels.clearLayers();
+      mapLayers.markers.clearLayers();
+
+      let freeCount = 0;
+
+      state.parcels.forEach(p=>{
+        const rect = L.rectangle(p.bounds, parcelStyle(p));
+        rect.addTo(mapLayers.parcels);
+
+        rect.on("click", ()=>{
+          if (p.occupied){
+            // show info only
+            selectedParcelId = p.id;
+            updateSelectedInfo();
+            refreshMapLayers();
+            return;
+          }
+          selectedParcelId = p.id;
+          updateSelectedInfo();
+          refreshMapLayers();
+        });
+
+        if (!p.occupied) freeCount++;
+
+        // If parcel has a placed object, show marker icon
+        const placed = state.placed.find(x=>x.parcelId===p.id);
+        if (placed){
+          const center = rect.getBounds().getCenter();
+          const iconHtml = `<div style="
+            width:34px;height:34px;border-radius:14px;
+            border:1px solid rgba(255,255,255,.18);
+            background: linear-gradient(135deg, rgba(124,92,255,.45), rgba(46,224,255,.25));
+            display:grid;place-items:center;
+            box-shadow: 0 12px 30px rgba(0,0,0,.35);
+            backdrop-filter: blur(6px);
+            ">
+            <span style="font-weight:800;color:white;font-size:12px">${placed.type[0].toUpperCase()}</span>
+          </div>`;
+          const icon = L.divIcon({className:"", html:iconHtml, iconSize:[34,34], iconAnchor:[17,17]});
+          L.marker(center, {icon}).addTo(mapLayers.markers)
+            .bindTooltip(`${OBJECT_META[placed.type].label} • scale ${placed.scale}`, {direction:"top", opacity:0.95});
+        }
+      });
+
+      document.getElementById("freeCountPill").textContent = `FREE: ${freeCount}`;
+    }
+
+    function updateSelectedInfo(){
+      const el = document.getElementById("selectedInfo");
+      if (!selectedParcelId){
+        el.textContent = "Выбери свободный участок на карте (зелёный контур).";
+        return;
+      }
+      const parcel = state.parcels.find(p=>p.id===selectedParcelId);
+      if (!parcel){
+        el.textContent = "Участок не найден.";
+        return;
+      }
+      const isFree = !parcel.occupied && !state.placed.find(x=>x.parcelId===parcel.id);
+      if (!isFree){
+        el.innerHTML = `Выбран участок <b>${parcel.id}</b> — <span style="color:rgba(255,255,255,.65)">занят</span>.
+                        <div class="smallNote" style="margin-top:8px">Для MVP свободные участки — это те, куда можно ставить новые объекты.</div>`;
+      }else{
+        el.innerHTML = `Выбран участок <b>${parcel.id}</b> — <span style="color:var(--good)">свободен</span>.
+                        <div class="smallNote" style="margin-top:8px">Нажми <b>Place</b>, чтобы добавить объект и запустить прогноз.</div>`;
+      }
+    }
+
+    function clearSelection(){
+      selectedParcelId = null;
+      updateSelectedInfo();
+      refreshMapLayers();
+    }
+
+    function canPlaceOn(parcelId){
+      const p = state.parcels.find(x=>x.id===parcelId);
+      if (!p) return false;
+      if (p.occupied) return false;
+      if (state.placed.some(x=>x.parcelId===parcelId)) return false;
+      return true;
+    }
+
+    function placeObject(){
+      if (!selectedParcelId) return toast("Сначала выбери участок на карте.");
+      if (!canPlaceOn(selectedParcelId)) return toast("Этот участок нельзя использовать (занят).");
+
+      const type = document.getElementById("objectType").value;
+      const scale = parseInt(document.getElementById("scale").value, 10);
+      const ecoPolicy = parseInt(document.getElementById("ecoPolicy").value, 10);
+      state.ecoPolicy = ecoPolicy;
+
+      const p = state.parcels.find(x=>x.id===selectedParcelId);
+      const bounds = L.latLngBounds(p.bounds);
+      const center = bounds.getCenter();
+
+      pushHistory();
+
+      state.placed.push({
+        id: "O"+(Date.now().toString(36)+Math.random().toString(36).slice(2,6)).toUpperCase(),
+        parcelId: selectedParcelId,
+        type,
+        scale,
+        latlng: [center.lat, center.lng]
+      });
+
+      // keep parcel free but "reserved" by placed object (occupied stays false; marker indicates usage)
+      // if you want to fully lock it:
+      // p.occupied = true;
+
+      refreshMapLayers();
+      recomputeAll(true);
+      toast(`Добавлено: ${OBJECT_META[type].label} на ${selectedParcelId}`);
+    }
+
+    /* =========================
+       Road Closure Drawing
+    ========================= */
+    function refreshClosure(){
+      mapLayers.closureLine.setLatLngs(state.closurePoints);
+      mapLayers.closureDots.clearLayers();
+
+      state.closurePoints.forEach((pt,i)=>{
+        const dot = L.circleMarker(pt, {
+          radius: 6,
+          color: "#ff5a7a",
+          weight: 2,
+          fillColor: "rgba(255,90,122,.55)",
+          fillOpacity: 0.9
+        }).addTo(mapLayers.closureDots);
+
+        dot.bindTooltip(`closure point ${i+1}`, {direction:"top", opacity:0.9});
+      });
+    }
+
+    function toggleClosureDrawing(){
+      state.isDrawingClosure = !state.isDrawingClosure;
+      const btn = document.getElementById("btnToggleClosure");
+      btn.textContent = state.isDrawingClosure ? "✅ Drawing…" : "🛑 Draw closure";
+      toast(state.isDrawingClosure ? "Режим рисования: кликай по карте (2–3 точки)." : "Рисование выключено.");
+    }
+
+    function clearClosure(){
+      pushHistory();
+      state.closurePoints = [];
+      state.isDrawingClosure = false;
+      document.getElementById("btnToggleClosure").textContent = "🛑 Draw closure";
+      refreshClosure();
+      recomputeAll(true);
+    }
+
+    /* =========================
+       KPI computation (MVP formulas)
+    ========================= */
+    function computeImpacts(){
+      // Sum object impacts (scale-weighted)
+      let dTraffic = 0, dAir = 0, dFoot = 0, budgetCost = 0;
+
+      // Eco policy increases mitigation for industry, and boosts park effect slightly
+      const eco = state.ecoPolicy / 100; // 0..1
+      const demand = state.demand / 100; // 0.8..1.4
+
+      const breakdown = {
+        park:{t:0,a:0,f:0,c:0},
+        residential:{t:0,a:0,f:0,c:0},
+        school:{t:0,a:0,f:0,c:0},
+        sports:{t:0,a:0,f:0,c:0},
+        industry:{t:0,a:0,f:0,c:0},
+        bridge:{t:0,a:0,f:0,c:0}
+      };
+
+      state.placed.forEach(o=>{
+        const meta = OBJECT_META[o.type];
+        const s = o.scale;                 // 1..5
+        const w = 0.55 + 0.15*s;           // scale weight ~0.7..1.3
+        let t = meta.traffic * w;
+        let a = meta.air * w;
+        let f = meta.foot * w;
+        let c = meta.cost[s-1];
+
+        // policy effects
+        if (o.type === "industry"){
+          // eco policy adds filters → reduce air damage and slightly reduce traffic via logistics optimization
+          const mitigation = lerp(0.08, 0.55, eco); // 8%..55%
+          a = a * (1 - mitigation);
+          t = t * (1 - mitigation*0.25);
+        }
+        if (o.type === "park"){
+          // eco policy supports greening → stronger benefit
+          const boost = lerp(0.00, 0.35, eco);
+          a = a * (1 + boost);
+          f = f * (1 + boost*0.65);
+        }
+        if (o.type === "bridge"){
+          // higher demand makes bridge more valuable (relieves more congestion)
+          t = t * lerp(0.92, 1.25, clamp(demand-1,0,0.4)/0.4);
+        }
+
+        // demand effect: more people amplify traffic and footfall pressures
+        t *= lerp(0.9, 1.25, clamp(demand-1, -0.2, 0.4) / 0.6 + 0.333);
+        f *= lerp(0.9, 1.20, clamp(demand-1, -0.2, 0.4) / 0.6 + 0.333);
+
+        dTraffic += t;
+        dAir += a;
+        dFoot += f;
+        budgetCost += c;
+
+        breakdown[o.type].t += t;
+        breakdown[o.type].a += a;
+        breakdown[o.type].f += f;
+        breakdown[o.type].c += c;
+      });
+
+      // road closure impact
+      const closure = state.roadClosure / 100; // 0..1
+      const hasClosure = state.closurePoints.length >= 2;
+      const closureFactor = hasClosure ? closure : 0;
+      // More points = more corridor length
+      const corridor = hasClosure ? clamp((state.closurePoints.length - 1) / 3, 0.33, 1.0) : 0;
+
+      // traffic goes worse with closure
+      dTraffic += 34 * closureFactor * corridor;
+
+      // air gets slightly worse due to idling
+      dAir += 10 * closureFactor * corridor;
+
+      // footfall can drop if closure is heavy (hard to reach places)
+      dFoot -= 8 * closureFactor * corridor;
+
+      // budget efficiency: penalize cost but reward improvements
+      // baseline budget 60; we compute efficiency 0..100
+      // "benefit" = improvements in air + foot, plus (traffic reduction)
+      const benefit = (-dAir*0.9) + (dFoot*0.7) + (-dTraffic*0.6);
+      const costPenalty = budgetCost * 0.12; // tune
+      let budget = state.base.budget + benefit*0.08 - costPenalty;
+      budget = clamp(budget, 0, 100);
+
+      return {dTraffic, dAir, dFoot, budgetCost, budget, breakdown, hasClosure};
+    }
+
+    function recomputeAll(force){
+      const impacts = computeImpacts();
+
+      const prev = {...state.kpi};
+
+      // KPI definitions:
+      // traffic and air: higher is worse; foot: higher is better; budget: higher is better
+      let traffic = clamp(state.base.traffic + impacts.dTraffic, 0, 100);
+      let air = clamp(state.base.air + impacts.dAir, 0, 100);
+      let foot = clamp(state.base.foot + impacts.dFoot, 0, 100);
+      let budget = impacts.budget;
+
+      // Convert to “nice” units
+      // traffic shown as "index"
+      // air shown as "AQI-like"
+      // foot as "flow"
+      // budget as "%"
+      state.kpi = {traffic, air, foot, budget};
+
+      // delta relative to baseline (or previous)
+      state.kpiDelta = {
+        traffic: traffic - state.base.traffic,
+        air: air - state.base.air,
+        foot: foot - state.base.foot,
+        budget: budget - state.base.budget
+      };
+
+      updateKPIUI();
+
+      state.story = buildStory(impacts);
+      document.getElementById("miniNarrative").innerHTML = state.story;
+
+      // update pills
+      document.getElementById("objectsPill").textContent = `OBJECTS: ${state.placed.length}`;
+      document.getElementById("policyChip").textContent = `eco-policy: ${state.ecoPolicy}%`;
+      document.getElementById("closureChip").textContent = `closure: ${state.roadClosure}%`;
+      document.getElementById("demandChip").textContent = `demand: ${state.demand}%`;
+      document.getElementById("detourChip").textContent = impacts.hasClosure ? "detours: active" : "detours: none";
+
+      // 3D update
+      rebuildThreeCity();
+
+      // lab charts / report
+      drawCharts();
+      refreshReport();
+      refreshObjectsList(impacts);
+
+      // keep scenario label “A/B/…”
+      if (force){
+        // subtle scenario increment feel when the user changes things a lot:
+        // we keep A but you can easily switch to B if needed
+      }
+    }
+
+    function updateKPIUI(){
+      const t = state.kpi.traffic;
+      const a = state.kpi.air;
+      const f = state.kpi.foot;
+      const b = state.kpi.budget;
+
+      const dt = state.kpiDelta.traffic;
+      const da = state.kpiDelta.air;
+      const df = state.kpiDelta.foot;
+      const db = state.kpiDelta.budget;
+
+      document.getElementById("kpiTraffic").textContent = fmt(t,0);
+      document.getElementById("kpiAir").textContent = fmt(a,0);
+      document.getElementById("kpiFoot").textContent = fmt(f,0);
+      document.getElementById("kpiBudget").textContent = pct(b);
+
+      document.getElementById("kpiTrafficDelta").innerHTML =
+        `Δ vs base: <span class="${colorForDelta(dt)}">${dt>=0?"+":""}${fmt(dt,0)}</span> (меньше — лучше)`;
+      document.getElementById("kpiAirDelta").innerHTML =
+        `Δ vs base: <span class="${colorForDelta(da)}">${da>=0?"+":""}${fmt(da,0)}</span> (меньше — лучше)`;
+      document.getElementById("kpiFootDelta").innerHTML =
+        `Δ vs base: <span class="${colorForDelta(df)}">${df>=0?"+":""}${fmt(df,0)}</span> (больше — лучше)`;
+      document.getElementById("kpiBudgetDelta").innerHTML =
+        `Δ vs base: <span class="${colorForDelta(db)}">${db>=0?"+":""}${fmt(db,0)}%</span> (больше — лучше)`;
+    }
+
+    function buildStory(impacts){
+      // Make it sound like “analyst”
+      const t = state.kpi.traffic, a = state.kpi.air, f = state.kpi.foot;
+      const dt = state.kpiDelta.traffic, da = state.kpiDelta.air, df = state.kpiDelta.foot;
+
+      const risk = [];
+      const wins = [];
+
+      if (dt > 8) risk.push("вероятный рост пробок в часы пик");
+      if (da > 6) risk.push("ухудшение качества воздуха из-за дополнительной нагрузки");
+      if (impacts.hasClosure && state.roadClosure >= 40) risk.push("перекрытие дороги усиливает объезды и задержки");
+      if (df < -4) risk.push("часть потоков людей смещается из зоны (доступность падает)");
+
+      if (da < -6) wins.push("экология улучшается (ниже концентрации загрязнений)");
+      if (dt < -6) wins.push("нагрузка на дороги снижается (меньше заторов)");
+      if (df > 8) wins.push("зона притягивает людей (рост активности и сервиса)");
+
+      const headline = `
+        <div style="font-weight:800;letter-spacing:.06em;margin-bottom:8px">
+          SUMMARY → traffic <span style="color:${t>65?"#ff5a7a":(t>55?"#ffd36a":"#44ffb2")}">${fmt(t,0)}</span>,
+          air <span style="color:${a>65?"#ff5a7a":(a>55?"#ffd36a":"#44ffb2")}">${fmt(a,0)}</span>,
+          footfall <span style="color:${f>60?"#44ffb2":(f>48?"#ffd36a":"#ff5a7a")}">${fmt(f,0)}</span>.
+        </div>`;
+
+      const bullets = `
+        <div style="color:rgba(255,255,255,.78);line-height:1.5">
+          <div>• Объектов в сценарии: <b>${state.placed.length}</b>, eco-policy: <b>${state.ecoPolicy}%</b>, demand: <b>${state.demand}%</b>.</div>
+          <div>• Изменение vs база: трафик <b>${dt>=0?"+":""}${fmt(dt,0)}</b>, воздух <b>${da>=0?"+":""}${fmt(da,0)}</b>, потоки людей <b>${df>=0?"+":""}${fmt(df,0)}</b>.</div>
+        </div>`;
+
+      const winBlock = wins.length ? `
+        <div style="margin-top:10px">
+          <span class="chip good">Плюсы</span>
+          <div style="margin-top:8px;color:rgba(255,255,255,.78);line-height:1.5">
+            ${wins.map(w=>`• ${w}`).join("<br/>")}
+          </div>
+        </div>` : "";
+
+      const riskBlock = risk.length ? `
+        <div style="margin-top:10px">
+          <span class="chip bad">Риски</span>
+          <div style="margin-top:8px;color:rgba(255,255,255,.78);line-height:1.5">
+            ${risk.map(r=>`• ${r}`).join("<br/>")}
+          </div>
+        </div>` : "";
+
+      const rec = `
+        <div style="margin-top:12px">
+          <span class="chip warn">Рекомендация</span>
+          <div style="margin-top:8px;color:rgba(255,255,255,.78);line-height:1.5">
+            ${makeRecommendation(dt, da, df, impacts)}
+          </div>
+        </div>`;
+
+      return headline + bullets + winBlock + riskBlock + rec;
+    }
+
+    function makeRecommendation(dt, da, df, impacts){
+      // simple rule-based advice
+      const tips = [];
+
+      if (dt > 10) tips.push("добавить меры по транспорту: развязка/мост, выделенные полосы, перераспределение потоков");
+      if (da > 8) tips.push("усилить экологические меры: фильтры/озеленение, контроль выбросов и логистики");
+      if (df < 0 && dt > 6) tips.push("поднять доступность: точки притяжения + удобные маршруты без перегруза дорог");
+      if (impacts.hasClosure && state.roadClosure > 30) tips.push("на время перекрытия — временные объезды и ограничения грузового трафика");
+
+      if (tips.length === 0){
+        tips.push("сценарий сбалансирован: можно масштабировать решение и проверить альтернативные размещения объектов.");
+      }
+
+      // concrete: propose a counter-object
+      const hasPark = state.placed.some(o=>o.type==="park");
+      const hasBridge = state.placed.some(o=>o.type==="bridge");
+      const hasIndustry = state.placed.some(o=>o.type==="industry");
+
+      if (hasIndustry && !hasPark) tips.push("для компенсации промонагрузки — добавить парк/зелёный коридор рядом с трафик-линиями.");
+      if (dt > 12 && !hasBridge) tips.push("если пробки критичны — разместить мост/связь на следующем свободном участке и сравнить KPI.");
+
+      return tips.map(t=>`• ${t}`).join("<br/>");
+    }
+
+    /* =========================
+       Charts (Canvas, no libs)
+    ========================= */
+    function drawCharts(){
+      drawTimelineChart(document.getElementById("chartTimeline"));
+      drawBreakdownChart(document.getElementById("chartBreakdown"));
+    }
+
+    function drawTimelineChart(canvas){
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      const w = canvas.clientWidth, h = canvas.clientHeight;
+      if (canvas.width !== w) canvas.width = w;
+      if (canvas.height !== h) canvas.height = h;
+
+      ctx.clearRect(0,0,w,h);
+
+      // background grid
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = "rgba(255,255,255,.10)";
+      ctx.lineWidth = 1;
+      for (let i=0;i<6;i++){
+        const y = (h-30) * (i/5) + 10;
+        ctx.beginPath();
+        ctx.moveTo(12,y);
+        ctx.lineTo(w-12,y);
+        ctx.stroke();
+      }
+
+      // build timeline (14 days) smoothing towards new KPIs
+      const days = 14;
+      const series = [];
+      const base = state.base;
+      const target = state.kpi;
+
+      // We'll plot 3 series: traffic (worse higher), air (worse higher), foot (better higher)
+      for (let d=0; d<days; d++){
+        const t = 1 - Math.pow(0.80, d+1); // ease-out
+        series.push({
+          traffic: lerp(base.traffic, target.traffic, t) + Math.sin(d*0.6)*0.8,
+          air: lerp(base.air, target.air, t) + Math.cos(d*0.55)*0.6,
+          foot: lerp(base.foot, target.foot, t) + Math.sin(d*0.4+1.5)*0.7
+        });
+      }
+
+      // plot function
+      function plot(key, color){
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2.2;
+        ctx.beginPath();
+        for (let i=0;i<days;i++){
+          const x = 18 + (w-36) * (i/(days-1));
+          const v = clamp(series[i][key], 0, 100);
+          const y = 10 + (h-40) * (1 - v/100);
+          if (i===0) ctx.moveTo(x,y);
+          else ctx.lineTo(x,y);
+        }
+        ctx.stroke();
+      }
+
+      // choose dynamic colors (no fixed palette, but still deterministic)
+      plot("traffic", "rgba(255,90,122,.90)");
+      plot("air", "rgba(255,211,106,.90)");
+      plot("foot", "rgba(68,255,178,.90)");
+
+      // labels
+      ctx.fillStyle = "rgba(255,255,255,.82)";
+      ctx.font = "12px ui-sans-serif, system-ui";
+      ctx.fillText("Traffic", 18, h-12);
+      ctx.fillStyle = "rgba(255,255,255,.72)";
+      ctx.fillText("• Air", 82, h-12);
+      ctx.fillStyle = "rgba(255,255,255,.62)";
+      ctx.fillText("• Footfall", 128, h-12);
+
+      // title small
+      ctx.fillStyle = "rgba(255,255,255,.55)";
+      ctx.font = "11px ui-monospace, monospace";
+      ctx.fillText("baseline → target (14 days)", w-190, 20);
+    }
+
+    function drawBreakdownChart(canvas){
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      const w = canvas.clientWidth, h = canvas.clientHeight;
+      if (canvas.width !== w) canvas.width = w;
+      if (canvas.height !== h) canvas.height = h;
+
+      ctx.clearRect(0,0,w,h);
+
+      const impacts = computeImpacts();
+      const types = Object.keys(OBJECT_META);
+
+      // compute magnitudes for each KPI component
+      const bars = types.map(t=>{
+        const b = impacts.breakdown[t];
+        return {
+          type:t,
+          t: b.t,
+          a: b.a,
+          f: b.f
+        };
+      });
+
+      // layout
+      const pad = 16;
+      const innerW = w - pad*2;
+      const innerH = h - pad*2 - 10;
+      const colW = innerW / types.length;
+
+      // find max abs for scaling
+      let maxAbs = 10;
+      bars.forEach(b=>{
+        maxAbs = Math.max(maxAbs, Math.abs(b.t), Math.abs(b.a), Math.abs(b.f));
+      });
+
+      // axis
+      ctx.strokeStyle = "rgba(255,255,255,.12)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(pad, pad + innerH*0.5);
+      ctx.lineTo(w-pad, pad + innerH*0.5);
+      ctx.stroke();
+
+      // draw bars: three thin bars per type
+      bars.forEach((b,i)=>{
+        const x0 = pad + i*colW + colW*0.18;
+        const baseY = pad + innerH*0.5;
+        const bw = colW*0.16;
+        const gap = colW*0.06;
+
+        const vals = [
+          {k:"t", v:b.t, c:"rgba(255,90,122,.85)"},
+          {k:"a", v:b.a, c:"rgba(255,211,106,.85)"},
+          {k:"f", v:b.f, c:"rgba(68,255,178,.85)"}
+        ];
+
+        vals.forEach((vv,idx)=>{
+          const x = x0 + idx*(bw+gap);
+          const y = baseY;
+          const hh = (vv.v / maxAbs) * (innerH*0.42);
+
+          ctx.fillStyle = vv.c;
+          ctx.globalAlpha = 0.95;
+
+          ctx.beginPath();
+          const top = y - hh;
+          const barH = hh;
+          // if negative, draw downward
+          if (barH >= 0){
+            roundedRect(ctx, x, top, bw, barH, 6);
+          }else{
+            roundedRect(ctx, x, y, bw, -barH, 6);
+          }
+          ctx.fill();
+        });
+
+        // labels
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = "rgba(255,255,255,.62)";
+        ctx.font = "10px ui-monospace, monospace";
+        ctx.fillText(OBJECT_META[b.type].label.slice(0,6), pad + i*colW + 6, h-12);
+      });
+
+      // legend
+      ctx.fillStyle = "rgba(255,255,255,.70)";
+      ctx.font = "11px ui-sans-serif, system-ui";
+      ctx.fillText("traffic", 18, 18);
+      ctx.fillStyle = "rgba(255,255,255,.60)";
+      ctx.fillText("air", 74, 18);
+      ctx.fillStyle = "rgba(255,255,255,.50)";
+      ctx.fillText("foot", 108, 18);
+
+      function roundedRect(ctx,x,y,w,h,r){
+        r = Math.min(r, w/2, h/2);
+        ctx.moveTo(x+r,y);
+        ctx.arcTo(x+w,y,x+w,y+h,r);
+        ctx.arcTo(x+w,y+h,x,y+h,r);
+        ctx.arcTo(x,y+h,x,y,r);
+        ctx.arcTo(x,y,x+w,y,r);
+        ctx.closePath();
+      }
+    }
+
+    /* =========================
+       Objects list (Lab)
+    ========================= */
+    function refreshObjectsList(impacts){
+      const list = document.getElementById("objectsList");
+      list.innerHTML = "";
+      if (state.placed.length === 0){
+        list.innerHTML = `<div class="smallNote">Пока нет объектов. Добавь их в Map Studio.</div>`;
+        return;
+      }
+
+      // compute per-object local effect (same as computeImpacts but per object)
+      const eco = state.ecoPolicy/100;
+      const demand = state.demand/100;
+
+      state.placed.slice().reverse().forEach(o=>{
+        const meta = OBJECT_META[o.type];
+        const s = o.scale;
+        const w = 0.55 + 0.15*s;
+        let t = meta.traffic*w;
+        let a = meta.air*w;
+        let f = meta.foot*w;
+        let c = meta.cost[s-1];
+
+        if (o.type === "industry"){
+          const mitigation = lerp(0.08, 0.55, eco);
+          a = a*(1-mitigation);
+          t = t*(1-mitigation*0.25);
+        }
+        if (o.type === "park"){
+          const boost = lerp(0.00, 0.35, eco);
+          a = a*(1+boost);
+          f = f*(1+boost*0.65);
+        }
+        if (o.type === "bridge"){
+          t = t*lerp(0.92, 1.25, clamp(demand-1,0,0.4)/0.4);
+        }
+
+        t *= lerp(0.9, 1.25, clamp(demand-1, -0.2, 0.4) / 0.6 + 0.333);
+        f *= lerp(0.9, 1.20, clamp(demand-1, -0.2, 0.4) / 0.6 + 0.333);
+
+        const card = document.createElement("div");
+        card.className = "item";
+        card.innerHTML = `
+          <div style="min-width:0">
+            <b>${meta.label} • ${o.parcelId}</b>
+            <span>scale ${o.scale} • cost ~ ${c}M (условно)<br/>
+              Δtraffic ${t>=0?"+":""}${fmt(t,1)} • Δair ${a>=0?"+":""}${fmt(a,1)} • Δfoot ${f>=0?"+":""}${fmt(f,1)}
+              <br/>${meta.note}
+            </span>
+          </div>
+          <div>
+            <button class="btn small danger" data-remove="${o.id}">✕</button>
+          </div>
+        `;
+        list.appendChild(card);
+      });
+
+      list.querySelectorAll("button[data-remove]").forEach(btn=>{
+        btn.addEventListener("click", ()=>{
+          const id = btn.getAttribute("data-remove");
+          pushHistory();
+          state.placed = state.placed.filter(x=>x.id!==id);
+          refreshMapLayers();
+          recomputeAll(true);
+          toast("Объект удалён.");
+        });
+      });
+    }
+
+    /* =========================
+       Report generation
+    ========================= */
+    function refreshReport(){
+      const rep = document.getElementById("reportText");
+      if (!rep) return;
+
+      const impacts = computeImpacts();
+      const lines = [];
+
+      const now = new Date();
+      const ts = now.toLocaleString("ru-RU");
+
+      lines.push(`# SMART TWIN • OSKEMEN — Analytical Report`);
+      lines.push(`Generated: ${ts}`);
+      lines.push(`Scenario: ${state.scenarioId}`);
+      lines.push(``);
+      lines.push(`## 1) Executive summary`);
+      lines.push(`- Objects: ${state.placed.length}`);
+      lines.push(`- Eco-policy: ${state.ecoPolicy}% • Demand: ${state.demand}% • Road closure: ${state.roadClosure}% (${impacts.hasClosure ? "active corridor" : "none"})`);
+      lines.push(`- KPI (0..100): traffic=${fmt(state.kpi.traffic,0)} (lower better), air=${fmt(state.kpi.air,0)} (lower better), footfall=${fmt(state.kpi.foot,0)} (higher better), budget=${pct(state.kpi.budget)}`);
+      lines.push(`- Δ vs baseline: traffic ${state.kpiDelta.traffic>=0?"+":""}${fmt(state.kpiDelta.traffic,0)}, air ${state.kpiDelta.air>=0?"+":""}${fmt(state.kpiDelta.air,0)}, footfall ${state.kpiDelta.foot>=0?"+":""}${fmt(state.kpiDelta.foot,0)}, budget ${state.kpiDelta.budget>=0?"+":""}${fmt(state.kpiDelta.budget,0)}%`);
+      lines.push(``);
+      lines.push(`## 2) What changed (causal model)`);
+      lines.push(`This MVP uses a transparent additive model: each object contributes to traffic/air/footfall, scaled by size and adjusted by policy knobs.`);
+      lines.push(`Road closures add congestion and emissions due to detours and idling, and can reduce accessibility.`);
+      lines.push(``);
+      lines.push(`## 3) Object list`);
+      if (state.placed.length===0){
+        lines.push(`(no objects yet — add them in Map Studio)`);
+      } else {
+        state.placed.forEach((o,i)=>{
+          const meta = OBJECT_META[o.type];
+          const cost = meta.cost[o.scale-1];
+          lines.push(`${i+1}. ${meta.label} @ ${o.parcelId} (scale ${o.scale}, cost~${cost}M)`);
+        });
+      }
+      lines.push(``);
+      lines.push(`## 4) Breakdown (approx.)`);
+      // Summarize breakdown totals
+      const sum = (key)=>{
+        let s=0;
+        for (const t of Object.keys(OBJECT_META)) s+= impacts.breakdown[t][key] || 0;
+        return s;
+      };
+      lines.push(`- Δtraffic (sum): ${fmt(sum("t"),1)}`);
+      lines.push(`- Δair (sum): ${fmt(sum("a"),1)}`);
+      lines.push(`- Δfoot (sum): ${fmt(sum("f"),1)}`);
+      lines.push(`- Budget cost (sum): ${fmt(impacts.budgetCost,0)}M (условно)`);
+      lines.push(``);
+      lines.push(`## 5) Recommendations`);
+      // reuse recommendation text but plain
+      const recHtml = makeRecommendation(state.kpiDelta.traffic, state.kpiDelta.air, state.kpiDelta.foot, impacts);
+      const recPlain = recHtml.replaceAll("<br/>","\n").replaceAll("• ","- ");
+      lines.push(recPlain);
+      lines.push(``);
+      lines.push(`## 6) Next steps (for “real product”)`);
+      lines.push(`- Plug real GIS data (GeoJSON districts/roads), real traffic counts and emissions factors.`);
+      lines.push(`- Calibrate model with historical observations, add uncertainty bands.`);
+      lines.push(`- Add multi-objective optimizer: minimize congestion+emissions, maximize accessibility & social benefit under budget.`);
+      lines.push(`- Generate PDF reports and dashboard sharing (team, municipality).`);
+
+      rep.value = lines.join("\n");
+
+      // pitch bullets
+      const pitch = document.getElementById("pitchBullets");
+      pitch.innerHTML =
+`• “Город как симулятор”: ставим объект → мгновенно видим последствия.<br/>
+• Слои: инфраструктура / транспорт / экология / люди (потоки).<br/>
+• Прозрачная модель: жюри видит логику, а не ‘магический ИИ’.<br/>
+• Лёгкий MVP: работает локально одним файлом, но выглядит как продукт.`;
+
+      // data snapshot
+      const snap = document.getElementById("dataSnapshot");
+      const snapshot = {
+        kpi: state.kpi,
+        policy: {ecoPolicy: state.ecoPolicy, demand: state.demand, roadClosure: state.roadClosure},
+        placed: state.placed,
+        closurePoints: state.closurePoints
+      };
+      snap.textContent = JSON.stringify(snapshot, null, 2);
+    }
+
+    /* =========================
+       Export buttons
+    ========================= */
+    function exportScenario(){
+      const scenario = {
+        name:`SmartTwin_Oskemen_${state.scenarioId}`,
+        createdAt: new Date().toISOString(),
+        base: state.base,
+        policy: {ecoPolicy: state.ecoPolicy, demand: state.demand, roadClosure: state.roadClosure},
+        kpi: state.kpi,
+        placed: state.placed,
+        closure: state.closurePoints
+      };
+      const blob = new Blob([JSON.stringify(scenario, null, 2)], {type:"application/json"});
+      downloadBlob(`scenario_${state.scenarioId}.json`, blob);
+    }
+
+    function downloadReportHTML(){
+      const text = document.getElementById("reportText").value;
+      const html = `
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Smart Twin Report</title>
+<style>
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial; padding:24px; max-width:900px; margin:0 auto; line-height:1.45}
+  pre{white-space:pre-wrap; background:#f6f6f6; padding:16px; border-radius:12px}
+  h1,h2{letter-spacing:.04em}
+  .kpi{display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin:16px 0}
+  .card{border:1px solid #ddd; padding:12px; border-radius:12px}
+  .muted{color:#555}
+</style>
+</head>
+<body>
+  <h1>SMART TWIN • OSKEMEN — Report</h1>
+  <div class="muted">Scenario ${state.scenarioId} • Generated ${new Date().toLocaleString("ru-RU")}</div>
+  <div class="kpi">
+    <div class="card"><b>Traffic</b><div>${fmt(state.kpi.traffic,0)}</div></div>
+    <div class="card"><b>Air</b><div>${fmt(state.kpi.air,0)}</div></div>
+    <div class="card"><b>Footfall</b><div>${fmt(state.kpi.foot,0)}</div></div>
+    <div class="card"><b>Budget</b><div>${pct(state.kpi.budget)}</div></div>
+  </div>
+  <pre>${escapeHtml(text)}</pre>
+<script>
+function escapeHtml(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
+</script>
+</body>
+</html>`;
+      const blob = new Blob([html], {type:"text/html"});
+      downloadBlob(`report_${state.scenarioId}.html`, blob);
+    }
+
+    function escapeHtml(s){
+      return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    }
+
+    /* =========================
+       UI wiring
+    ========================= */
+    document.getElementById("btnPlace").addEventListener("click", placeObject);
+    document.getElementById("btnClearSelection").addEventListener("click", clearSelection);
+
+    document.getElementById("roadClosure").addEventListener("input", (e)=>{
+      state.roadClosure = parseInt(e.target.value,10);
+      recomputeAll(true);
+    });
+
+    document.getElementById("ecoPolicy").addEventListener("input", (e)=>{
+      state.ecoPolicy = parseInt(e.target.value,10);
+      recomputeAll(true);
+    });
+
+    document.getElementById("demand").addEventListener("input", (e)=>{
+      state.demand = parseInt(e.target.value,10);
+      recomputeAll(true);
+    });
+
+    document.getElementById("btnToggleClosure").addEventListener("click", toggleClosureDrawing);
+    document.getElementById("btnClearClosure").addEventListener("click", clearClosure);
+
+    document.getElementById("btnUndo").addEventListener("click", undo);
+    document.getElementById("btnReset").addEventListener("click", resetAll);
+    document.getElementById("btnExport").addEventListener("click", exportScenario);
+
+    document.getElementById("btnDownloadJSON").addEventListener("click", exportScenario);
+    document.getElementById("btnDownloadHTML").addEventListener("click", downloadReportHTML);
+
+    document.getElementById("btnRecompute").addEventListener("click", ()=>recomputeAll(true));
+    document.getElementById("btnAutoStory").addEventListener("click", ()=>{
+      toast("Story обновлён (см. Overview / Report).");
+      setActiveTab("home");
+    });
+
+    /* =========================
+       Toast
+    ========================= */
+    let toastEl = null;
+    function toast(msg){
+      if (!toastEl){
+        toastEl = document.createElement("div");
+        toastEl.style.position="fixed";
+        toastEl.style.left="50%";
+        toastEl.style.bottom="22px";
+        toastEl.style.transform="translateX(-50%)";
+        toastEl.style.padding="12px 14px";
+        toastEl.style.borderRadius="16px";
+        toastEl.style.border="1px solid rgba(255,255,255,.16)";
+        toastEl.style.background="rgba(0,0,0,.35)";
+        toastEl.style.backdropFilter="blur(10px)";
+        toastEl.style.color="rgba(255,255,255,.86)";
+        toastEl.style.boxShadow="0 18px 50px rgba(0,0,0,.5)";
+        toastEl.style.fontSize="12px";
+        toastEl.style.letterSpacing=".04em";
+        toastEl.style.zIndex="9999";
+        toastEl.style.opacity="0";
+        toastEl.style.transition="opacity .18s ease, transform .18s ease";
+        document.body.appendChild(toastEl);
+      }
+      toastEl.textContent = msg;
+      toastEl.style.opacity="1";
+      toastEl.style.transform="translateX(-50%) translateY(-2px)";
+      clearTimeout(toastEl._t);
+      toastEl._t = setTimeout(()=>{
+        toastEl.style.opacity="0";
+        toastEl.style.transform="translateX(-50%) translateY(6px)";
+      }, 1600);
+    }
+
+    /* =========================
+       THREE.js Mini City (Overview)
+    ========================= */
+    let three = null;
+
+    function initThree(){
+      const canvas = document.getElementById("threeHome");
+      const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true});
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+      const scene = new THREE.Scene();
+
+      const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 200);
+      camera.position.set(10, 12, 16);
+
+      // lights
+      const amb = new THREE.AmbientLight(0xffffff, 0.45);
+      scene.add(amb);
+
+      const key = new THREE.DirectionalLight(0xffffff, 0.8);
+      key.position.set(10, 18, 8);
+      scene.add(key);
+
+      const rim = new THREE.DirectionalLight(0x88ccff, 0.45);
+      rim.position.set(-10, 10, -10);
+      scene.add(rim);
+
+      // ground
+      const groundGeo = new THREE.CircleGeometry(16, 64);
+      const groundMat = new THREE.MeshStandardMaterial({
+        color: 0x0b1020,
+        metalness: 0.1,
+        roughness: 0.9
+      });
+      const ground = new THREE.Mesh(groundGeo, groundMat);
+      ground.rotation.x = -Math.PI/2;
+      ground.position.y = -0.02;
+      scene.add(ground);
+
+      // grid glow ring
+      const ringGeo = new THREE.RingGeometry(13.2, 13.9, 96);
+      const ringMat = new THREE.MeshBasicMaterial({color:0x7c5cff, transparent:true, opacity:0.22, side:THREE.DoubleSide});
+      const ring = new THREE.Mesh(ringGeo, ringMat);
+      ring.rotation.x = -Math.PI/2;
+      ring.position.y = 0.01;
+      scene.add(ring);
+
+      // city group
+      const city = new THREE.Group();
+      scene.add(city);
+
+      // particle “data sparks”
+      const sparkCount = 220;
+      const sparkGeo = new THREE.BufferGeometry();
+      const sparkPos = new Float32Array(sparkCount*3);
+      for (let i=0;i<sparkCount;i++){
+        const r = rnd(2, 13);
+        const ang = rnd(0, Math.PI*2);
+        sparkPos[i*3+0] = Math.cos(ang)*r;
+        sparkPos[i*3+1] = rnd(0.2, 5.2);
+        sparkPos[i*3+2] = Math.sin(ang)*r;
+      }
+      sparkGeo.setAttribute("position", new THREE.BufferAttribute(sparkPos, 3));
+      const sparkMat = new THREE.PointsMaterial({color:0x2ee0ff, size:0.04, transparent:true, opacity:0.55});
+      const sparks = new THREE.Points(sparkGeo, sparkMat);
+      scene.add(sparks);
+
+      // store
+      three = {renderer, scene, camera, city, ring, sparks, canvas};
+
+      // initial build
+      rebuildThreeCity();
+
+      function resize(){
+        const rect = canvas.getBoundingClientRect();
+        const w = Math.max(300, rect.width);
+        const h = Math.max(280, rect.height);
+        renderer.setSize(w, h, false);
+        camera.aspect = w/h;
+        camera.updateProjectionMatrix();
+      }
+      window.addEventListener("resize", resize);
+      resize();
+
+      // animate
+      let t0 = performance.now();
+      function loop(t){
+        const dt = (t - t0) / 1000;
+        t0 = t;
+
+        // orbit camera
+        const time = t*0.00025;
+        const radius = 18;
+        camera.position.x = Math.cos(time) * radius;
+        camera.position.z = Math.sin(time) * radius;
+        camera.position.y = 11.5 + Math.sin(time*2)*0.6;
+        camera.lookAt(0, 2.5, 0);
+
+        // pulse ring based on traffic/air
+        const danger = clamp((state.kpi.traffic + state.kpi.air)/200, 0, 1);
+        three.ring.material.opacity = 0.12 + danger*0.22;
+        three.ring.material.color.setHex(danger>0.62 ? 0xff5a7a : (danger>0.52 ? 0xffd36a : 0x7c5cff));
+
+        // animate sparks drifting
+        const pos = three.sparks.geometry.attributes.position;
+        for (let i=0;i<pos.count;i++){
+          let y = pos.getY(i) + dt*(0.6 + danger*0.8);
+          if (y > 6) y = 0.25;
+          pos.setY(i, y);
+        }
+        pos.needsUpdate = true;
+
+        // subtle city bob
+        three.city.rotation.y = Math.sin(t*0.0002)*0.08;
+
+        renderer.render(scene, camera);
+        requestAnimationFrame(loop);
+      }
+      requestAnimationFrame(loop);
+    }
+
+    function clearThreeCity(){
+      if (!three) return;
+      const g = three.city;
+      while (g.children.length){
+        const obj = g.children.pop();
+        if (obj.geometry) obj.geometry.dispose();
+        if (obj.material){
+          if (Array.isArray(obj.material)) obj.material.forEach(m=>m.dispose());
+          else obj.material.dispose();
+        }
+      }
+    }
+
+    function rebuildThreeCity(){
+      if (!three) return;
+      clearThreeCity();
+
+      const city = three.city;
+
+      // base blocks (existing occupied parcels)
+      const blocks = [];
+      const occupied = state.parcels.filter(p=>p.occupied);
+      const total = state.parcels.length;
+      // map parcels to a 6x6 grid positions in 3D
+      const gridSize = Math.sqrt(total) | 0;
+      const spacing = 2.2;
+
+      state.parcels.forEach((p, idx)=>{
+        const gx = (idx % gridSize) - (gridSize-1)/2;
+        const gz = Math.floor(idx / gridSize) - (gridSize-1)/2;
+
+        const x = gx * spacing;
+        const z = gz * spacing;
+
+        const isPlaced = state.placed.find(o=>o.parcelId===p.id);
+        const isOccupied = p.occupied;
+
+        // base tile
+        const tileGeo = new THREE.BoxGeometry(1.9, 0.15, 1.9);
+        const tileMat = new THREE.MeshStandardMaterial({
+          color: isPlaced ? 0x1b1a2d : (isOccupied ? 0x0f1427 : 0x0d1520),
+          metalness: 0.2,
+          roughness: 0.9
+        });
+        const tile = new THREE.Mesh(tileGeo, tileMat);
+        tile.position.set(x, 0.05, z);
+        city.add(tile);
+
+        // “free” edge glow
+        if (!isOccupied && !isPlaced){
+          const edgeGeo = new THREE.BoxGeometry(2.02, 0.18, 2.02);
+          const edgeMat = new THREE.MeshBasicMaterial({color:0x44ffb2, transparent:true, opacity:0.10});
+          const edge = new THREE.Mesh(edgeGeo, edgeMat);
+          edge.position.set(x,0.06,z);
+          city.add(edge);
+        }
+
+        // existing buildings
+        if (isOccupied){
+          const h = rnd(1.2, 4.8);
+          const bGeo = new THREE.BoxGeometry(1.2, h, 1.2);
+          const bMat = new THREE.MeshStandardMaterial({
+            color: (p.baseType==="industry") ? 0x3a2b3a : 0x223058,
+            metalness: 0.25,
+            roughness: 0.6,
+            emissive: new THREE.Color(0x0b0f1f),
+            emissiveIntensity: 0.3
+          });
+          const b = new THREE.Mesh(bGeo, bMat);
+          b.position.set(x, h/2 + 0.15, z);
+          city.add(b);
+
+          // smoke stack if industry
+          if (p.baseType==="industry"){
+            const sGeo = new THREE.CylinderGeometry(0.18,0.22,1.8,16);
+            const sMat = new THREE.MeshStandardMaterial({color:0x2a2030, metalness:0.2, roughness:0.6});
+            const s = new THREE.Mesh(sGeo, sMat);
+            s.position.set(x+0.55, 1.05, z+0.4);
+            city.add(s);
+          }
+        }
+
+        // placed object
+        if (isPlaced){
+          const meta = OBJECT_META[isPlaced.type];
+          const s = isPlaced.scale;
+          const baseY = 0.15;
+
+          if (isPlaced.type === "park"){
+            const parkGeo = new THREE.BoxGeometry(1.55, 0.18, 1.55);
+            const parkMat = new THREE.MeshStandardMaterial({color:0x1a3b2d, roughness:0.95});
+            const park = new THREE.Mesh(parkGeo, parkMat);
+            park.position.set(x, baseY+0.10, z);
+            city.add(park);
+
+            // trees
+            const treeCount = 4 + s;
+            for (let i=0;i<treeCount;i++){
+              const tx = x + rnd(-0.55, 0.55);
+              const tz = z + rnd(-0.55, 0.55);
+              const th = rnd(0.9, 1.6) + s*0.08;
+              const trunkGeo = new THREE.CylinderGeometry(0.05,0.07,0.45,10);
+              const trunkMat = new THREE.MeshStandardMaterial({color:0x3a2a1f, roughness:0.9});
+              const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+              trunk.position.set(tx, baseY+0.28, tz);
+              city.add(trunk);
+
+              const crownGeo = new THREE.SphereGeometry(0.30 + s*0.03, 14, 14);
+              const crownMat = new THREE.MeshStandardMaterial({color:0x44ffb2, roughness:0.8, emissive:0x0a2b1f, emissiveIntensity:0.25});
+              const crown = new THREE.Mesh(crownGeo, crownMat);
+              crown.position.set(tx, baseY+0.55 + th*0.15, tz);
+              city.add(crown);
+            }
+          } else if (isPlaced.type === "bridge"){
+            const bGeo = new THREE.BoxGeometry(1.8, 0.25, 0.55);
+            const bMat = new THREE.MeshStandardMaterial({color:0x7c5cff, metalness:0.35, roughness:0.35, emissive:0x221a55, emissiveIntensity:0.25});
+            const bridge = new THREE.Mesh(bGeo, bMat);
+            bridge.position.set(x, baseY+0.6, z);
+            city.add(bridge);
+
+            // pylons
+            const pGeo = new THREE.BoxGeometry(0.18, 1.0, 0.18);
+            const pMat = new THREE.MeshStandardMaterial({color:0x2b2b45, roughness:0.6});
+            const p1 = new THREE.Mesh(pGeo, pMat); p1.position.set(x-0.6, baseY+0.55, z);
+            const p2 = new THREE.Mesh(pGeo, pMat); p2.position.set(x+0.6, baseY+0.55, z);
+            city.add(p1); city.add(p2);
+          } else {
+            // generic building: height depends on scale
+            const h = 1.2 + s*0.8;
+            const geo = new THREE.BoxGeometry(1.2, h, 1.2);
+            const col = (isPlaced.type==="industry") ? 0x5a2b3b :
+                        (isPlaced.type==="residential") ? 0x2a4c7a :
+                        (isPlaced.type==="school") ? 0x3b3a66 :
+                        0x2d5a55; // sports
+            const mat = new THREE.MeshStandardMaterial({
+              color: col,
+              roughness: 0.55,
+              metalness: 0.22,
+              emissive: new THREE.Color(0x0b1020),
+              emissiveIntensity: 0.35
+            });
+            const box = new THREE.Mesh(geo, mat);
+            box.position.set(x, baseY + h/2, z);
+            city.add(box);
+
+            // “windows” glow layer
+            const glowGeo = new THREE.BoxGeometry(1.22, h*0.95, 1.22);
+            const glowMat = new THREE.MeshBasicMaterial({
+              color: 0x2ee0ff,
+              transparent:true,
+              opacity: 0.06 + (isPlaced.type==="residential"?0.05:0.02)
+            });
+            const glow = new THREE.Mesh(glowGeo, glowMat);
+            glow.position.copy(box.position);
+            city.add(glow);
+
+            // smoke if industry (policy reduces opacity)
+            if (isPlaced.type==="industry"){
+              const eco = state.ecoPolicy/100;
+              const smokeGeo = new THREE.SphereGeometry(0.28, 12, 12);
+              const smokeMat = new THREE.MeshBasicMaterial({
+                color:0xff5a7a,
+                transparent:true,
+                opacity: lerp(0.18, 0.06, eco)
+              });
+              const smoke = new THREE.Mesh(smokeGeo, smokeMat);
+              smoke.position.set(x+0.55, baseY + h + 0.35, z+0.25);
+              city.add(smoke);
+            }
+          }
+
+          // add “flow arcs” around objects based on footfall change
+          // (simple rings)
+          const ringCount = clamp(Math.round((state.kpi.foot - state.base.foot)/12), 0, 4);
+          for (let k=0;k<ringCount;k++){
+            const rg = new THREE.RingGeometry(0.55 + k*0.18, 0.58 + k*0.18, 48);
+            const rm = new THREE.MeshBasicMaterial({color:0x44ffb2, transparent:true, opacity:0.12, side:THREE.DoubleSide});
+            const rr = new THREE.Mesh(rg, rm);
+            rr.rotation.x = -Math.PI/2;
+            rr.position.set(x, 0.18 + k*0.05, z);
+            city.add(rr);
+          }
+        }
+      });
+
+      // “traffic ribbons” — show congestion intensity as curved lines
+      const danger = clamp((state.kpi.traffic - 40)/60, 0, 1);
+      const ribbonCount = 3 + Math.round(danger*5);
+
+      for (let i=0;i<ribbonCount;i++){
+        const curve = new THREE.QuadraticBezierCurve3(
+          new THREE.Vector3(rnd(-7,7), rnd(0.6,1.2), rnd(-7,7)),
+          new THREE.Vector3(rnd(-2,2), rnd(1.3,2.6), rnd(-2,2)),
+          new THREE.Vector3(rnd(-7,7), rnd(0.6,1.2), rnd(-7,7))
+        );
+        const points = curve.getPoints(40);
+        const geo = new THREE.BufferGeometry().setFromPoints(points);
+        const mat = new THREE.LineBasicMaterial({
+          color: danger>0.62 ? 0xff5a7a : (danger>0.42 ? 0xffd36a : 0x2ee0ff),
+          transparent:true,
+          opacity: 0.22 + danger*0.25
+        });
+        const line = new THREE.Line(geo, mat);
+        city.add(line);
+      }
+    }
+
+    /* =========================
+       Boot
+    ========================= */
+    // selection init
+    updateSelectedInfo();
+
+    // slider init UI
+    document.getElementById("ecoPolicy").value = state.ecoPolicy;
+    document.getElementById("roadClosure").value = state.roadClosure;
+    document.getElementById("demand").value = state.demand;
+
+    // extra: export from top bar
+    document.getElementById("btnExport").addEventListener("click", exportScenario);
+
+    // init map + three
+    initMap();
+    initThree();
+    refreshReport();
+
+    // export on top bar
+    function refreshClosurePill(){
+      document.getElementById("closureChip").textContent = `closure: ${state.roadClosure}%`;
+    }
+
+    // helper: refresh closure from current state
+    function refreshClosure(){
+      if (!mapLayers.closureLine) return;
+      mapLayers.closureLine.setLatLngs(state.closurePoints);
+      mapLayers.closureDots.clearLayers();
+      state.closurePoints.forEach((pt,i)=>{
+        const dot = L.circleMarker(pt, {
+          radius: 6,
+          color: "#ff5a7a",
+          weight: 2,
+          fillColor: "rgba(255,90,122,.55)",
+          fillOpacity: 0.9
+        }).addTo(mapLayers.closureDots);
+        dot.on("click", ()=>{
+          // remove point
+          pushHistory();
+          state.closurePoints.splice(i,1);
+          refreshClosure();
+          recomputeAll(true);
+        });
+      });
+    }
+
+    // export scenario: attach to report too
+    function refreshReport(){
+      const rep = document.getElementById("reportText");
+      if (!rep) return;
+
+      const impacts = computeImpacts();
+      const now = new Date();
+      const ts = now.toLocaleString("ru-RU");
+
+      const lines = [];
+      lines.push(`# SMART TWIN • OSKEMEN — Analytical Report`);
+      lines.push(`Generated: ${ts}`);
+      lines.push(`Scenario: ${state.scenarioId}`);
+      lines.push(``);
+      lines.push(`## 0) Problem statement (HackOS case)`);
+      lines.push(`We need a digital twin that can simulate consequences of city decisions: build objects, change routes/roads, predict traffic & ecology, visualize results, and produce analytical reports.`);
+      lines.push(``);
+      lines.push(`## 1) Executive summary`);
+      lines.push(`- Objects: ${state.placed.length}`);
+      lines.push(`- Eco-policy: ${state.ecoPolicy}% • Demand: ${state.demand}% • Road closure: ${state.roadClosure}% (${impacts.hasClosure ? "active corridor" : "none"})`);
+      lines.push(`- KPI (0..100): traffic=${fmt(state.kpi.traffic,0)} (lower better), air=${fmt(state.kpi.air,0)} (lower better), footfall=${fmt(state.kpi.foot,0)} (higher better), budget=${pct(state.kpi.budget)}`);
+      lines.push(`- Δ vs baseline: traffic ${state.kpiDelta.traffic>=0?"+":""}${fmt(state.kpiDelta.traffic,0)}, air ${state.kpiDelta.air>=0?"+":""}${fmt(state.kpiDelta.air,0)}, footfall ${state.kpiDelta.foot>=0?"+":""}${fmt(state.kpiDelta.foot,0)}, budget ${state.kpiDelta.budget>=0?"+":""}${fmt(state.kpiDelta.budget,0)}%`);
+      lines.push(``);
+      lines.push(`## 2) What-if simulation logic (transparent MVP)`);
+      lines.push(`- Each object adds weighted impacts to: traffic, air, footfall, plus budget cost (scale 1..5).`);
+      lines.push(`- Eco-policy mitigates industrial emissions and boosts greening effects.`);
+      lines.push(`- Demand increases pressure on traffic and changes people flows.`);
+      lines.push(`- Road closure corridor increases congestion and emissions and can reduce accessibility.`);
+      lines.push(``);
+      lines.push(`## 3) Objects`);
+      if (state.placed.length===0){
+        lines.push(`(no objects yet — add them in Map Studio)`);
+      } else {
+        state.placed.forEach((o,i)=>{
+          const meta = OBJECT_META[o.type];
+          const cost = meta.cost[o.scale-1];
+          lines.push(`${i+1}. ${meta.label} @ ${o.parcelId} (scale ${o.scale}, cost~${cost}M)`);
+        });
+      }
+      lines.push(``);
+      lines.push(`## 4) Recommendations`);
+      const recHtml = makeRecommendation(state.kpiDelta.traffic, state.kpiDelta.air, state.kpiDelta.foot, impacts);
+      const recPlain = recHtml.replaceAll("<br/>","\n").replaceAll("• ","- ");
+      lines.push(recPlain);
+      lines.push(``);
+      lines.push(`## 5) Next steps`);
+      lines.push(`- Add real GIS layers (roads, districts) and calibrate with data (counts, sensors).`);
+      lines.push(`- Add uncertainty (confidence ranges), and multi-objective optimization under budget.`);
+      lines.push(`- Add export to PDF directly and scenario sharing for municipal teams.`);
+
+      rep.value = lines.join("\n");
+
+      const pitch = document.getElementById("pitchBullets");
+      pitch.innerHTML =
+`• “Поставь объект → увидь эффект”: мгновенная обратная связь для решений.<br/>
+• 2D карта + 3D вид + графики: удобно для жюри и для города.<br/>
+• Прозрачные правила → доверие (можно объяснить логику).<br/>
+• Масштабируется до реального продукта с данными (GeoJSON, датчики).`;
+
+      const snap = document.getElementById("dataSnapshot");
+      snap.textContent = JSON.stringify({
+        kpi: state.kpi,
+        policy: {ecoPolicy: state.ecoPolicy, demand: state.demand, roadClosure: state.roadClosure},
+        placed: state.placed,
+        closurePoints: state.closurePoints
+      }, null, 2);
+    }
+
+    /* =========================
+       Final wiring (top bar)
+    ========================= */
+    document.getElementById("btnExport").addEventListener("click", exportScenario);
+
+  </script>
+</body>
+</html>
